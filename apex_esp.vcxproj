@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{A7F9E8B3-1234-4567-89AB-CDEF01234567}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>apexesp</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
+    <ProjectName>ext</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\OS-ImGui;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d11.lib;d3dcompiler.lib;dxgi.lib;dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <EntryPointSymbol>WinMainCRTStartup</EntryPointSymbol>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\driver\driver_interface.cpp" />
+    <ClCompile Include="src\game\triggerbot.cpp" />
+    <ClCompile Include="src\overlay\overlay.cpp" />
+    <ClCompile Include="src\OS-ImGui\OS-ImGui.cpp" />
+    <ClCompile Include="src\OS-ImGui\OS-ImGui_Base.cpp" />
+    <ClCompile Include="src\OS-ImGui\OS-ImGui_External.cpp" />
+    <ClCompile Include="src\OS-ImGui\imgui\imgui.cpp" />
+    <ClCompile Include="src\OS-ImGui\imgui\imgui_demo.cpp" />
+    <ClCompile Include="src\OS-ImGui\imgui\imgui_draw.cpp" />
+    <ClCompile Include="src\OS-ImGui\imgui\imgui_tables.cpp" />
+    <ClCompile Include="src\OS-ImGui\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\OS-ImGui\imgui\imgui_impl_dx11.cpp" />
+    <ClCompile Include="src\OS-ImGui\imgui\imgui_impl_win32.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\driver\driver_interface.h" />
+    <ClInclude Include="src\driver\common.h" />
+    <ClInclude Include="src\security\process_protection.h" />
+    <ClInclude Include="src\memory\memory_reader.h" />
+    <ClInclude Include="src\memory\offsets.h" />
+    <ClInclude Include="src\game\entity.h" />
+    <ClInclude Include="src\game\math.h" />
+    <ClInclude Include="src\game\triggerbot.h" />
+    <ClInclude Include="src\game\esp_feature.h" />
+    <ClInclude Include="src\game\feature_manager.h" />
+    <ClInclude Include="src\game\distance_manager.h" />
+    <ClInclude Include="src\overlay\overlay.h" />
+    <ClInclude Include="src\OS-ImGui\OS-ImGui.h" />
+    <ClInclude Include="src\OS-ImGui\OS-ImGui_Base.h" />
+    <ClInclude Include="src\OS-ImGui\OS-ImGui_External.h" />
+    <ClInclude Include="src\OS-ImGui\OS-ImGui_Struct.h" />
+    <ClInclude Include="src\OS-ImGui\OS-ImGui_Exception.hpp" />
+    <ClInclude Include="src\OS-ImGui\imgui\imgui.h" />
+    <ClInclude Include="src\OS-ImGui\imgui\imgui_impl_dx11.h" />
+    <ClInclude Include="src\OS-ImGui\imgui\imgui_impl_win32.h" />
+    <ClInclude Include="src\OS-ImGui\imgui\imconfig.h" />
+    <ClInclude Include="src\OS-ImGui\imgui\imgui_internal.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

@@ -1,0 +1,12 @@
+﻿C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets(533,5): warning MSB8004: Intermediate Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Intermediate Directory.
+C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets(534,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
+  main.cpp
+C:\Users\haeri\Downloads\Compressed\skibidirizz\ext\uictl\usermode\driver.h(39,32): warning C4129: 'p': unrecognized character escape sequence
+  (compiling source file 'main.cpp')
+  
+C:\Users\haeri\Downloads\Compressed\skibidirizz\ext\uictl\usermode\main.cpp(7,6): warning C4326: return type of 'main' should be 'int' instead of 'void'
+  Generating code
+  Previous IPDB was built with incompatible compiler, fall back to full compilation.
+  All 14 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  usermode.vcxproj -> C:\Users\haeri\Downloads\Compressed\skibidirizz\ext\uictl\build\usermode\usermode.exe
