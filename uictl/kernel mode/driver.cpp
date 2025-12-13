@@ -75,7 +75,19 @@ BOOLEAN IsAddressValid(PVOID Address) {
 
 NTSTATUS SafeReadPhysicalMemory(UINT64 physAddress, PVOID buffer, SIZE_T size, SIZE_T* bytesRead) {
     __try {
+        if (bytesRead) *bytesRead = 0;
+        
         if (physAddress == 0 || buffer == NULL || size == 0) {
+            return STATUS_INVALID_PARAMETER;
+        }
+        
+        // Validate physical address range (typical RAM limit: 128GB = 0x2000000000)
+        if (physAddress > 0x2000000000ULL) {
+            return STATUS_INVALID_ADDRESS;
+        }
+        
+        // Don't read more than 1MB at once
+        if (size > 0x100000) {
             return STATUS_INVALID_PARAMETER;
         }
         
@@ -84,6 +96,7 @@ NTSTATUS SafeReadPhysicalMemory(UINT64 physAddress, PVOID buffer, SIZE_T size, S
         return MmCopyMemory(buffer, toRead, size, MM_COPY_MEMORY_PHYSICAL, bytesRead);
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
+        if (bytesRead) *bytesRead = 0;
         return STATUS_ACCESS_VIOLATION;
     }
 }
@@ -143,6 +156,11 @@ UINT64 TranslateLinear(UINT64 directoryTableBase, UINT64 virtualAddress) {
             return 0;
         }
         
+        // Validate virtual address is canonical
+        if (virtualAddress > 0x00007FFFFFFFFFFF && virtualAddress < 0xFFFF800000000000) {
+            return 0; // Non-canonical address
+        }
+        
         directoryTableBase &= ~0xf;
         UINT64 pageOffset = virtualAddress & ~(~0ul << PAGE_OFFSET_SIZE);
         UINT64 pte = ((virtualAddress >> 12) & (0x1ffll));
@@ -153,30 +171,46 @@ UINT64 TranslateLinear(UINT64 directoryTableBase, UINT64 virtualAddress) {
         SIZE_T readsize = 0;
         UINT64 pdpe = 0;
         
-        NTSTATUS status = SafeReadPhysicalMemory(directoryTableBase + 8 * pdp, &pdpe, sizeof(pdpe), &readsize);
+        UINT64 pdpAddr = directoryTableBase + 8 * pdp;
+        if (pdpAddr > 0x2000000000ULL) return 0; // Physical address out of range
+        
+        NTSTATUS status = SafeReadPhysicalMemory(pdpAddr, &pdpe, sizeof(pdpe), &readsize);
         if (!NT_SUCCESS(status) || (~pdpe & 1)) return 0;
 
         UINT64 pde = 0;
-        status = SafeReadPhysicalMemory((pdpe & PMASK) + 8 * pd, &pde, sizeof(pde), &readsize);
+        UINT64 pdAddr = (pdpe & PMASK) + 8 * pd;
+        if (pdAddr > 0x2000000000ULL) return 0;
+        
+        status = SafeReadPhysicalMemory(pdAddr, &pde, sizeof(pde), &readsize);
         if (!NT_SUCCESS(status) || (~pde & 1)) return 0;
 
         if (pde & 0x80)
             return (pde & (~0ull << 42 >> 12)) + (virtualAddress & ~(~0ull << 30));
 
         UINT64 pteAddr = 0;
-        status = SafeReadPhysicalMemory((pde & PMASK) + 8 * pt, &pteAddr, sizeof(pteAddr), &readsize);
+        UINT64 ptAddr = (pde & PMASK) + 8 * pt;
+        if (ptAddr > 0x2000000000ULL) return 0;
+        
+        status = SafeReadPhysicalMemory(ptAddr, &pteAddr, sizeof(pteAddr), &readsize);
         if (!NT_SUCCESS(status) || (~pteAddr & 1)) return 0;
 
         if (pteAddr & 0x80)
             return (pteAddr & PMASK) + (virtualAddress & ~(~0ull << 21));
 
         UINT64 addr = 0;
-        status = SafeReadPhysicalMemory((pteAddr & PMASK) + 8 * pte, &addr, sizeof(addr), &readsize);
+        UINT64 finalAddr = (pteAddr & PMASK) + 8 * pte;
+        if (finalAddr > 0x2000000000ULL) return 0;
+        
+        status = SafeReadPhysicalMemory(finalAddr, &addr, sizeof(addr), &readsize);
         if (!NT_SUCCESS(status)) return 0;
         
         addr &= PMASK;
         if (!addr) return 0;
-        return addr + pageOffset;
+        
+        UINT64 result = addr + pageOffset;
+        if (result > 0x2000000000ULL) return 0; // Final physical address out of range
+        
+        return result;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         return 0;
@@ -199,6 +233,12 @@ NTSTATUS HandleReadMemory(PSHARED_MEMORY sharedMem) {
         if (sharedMem->Request.Size > MAX_DATA_SIZE)
             return STATUS_BUFFER_TOO_SMALL;
 
+        // Validate virtual address is canonical
+        UINT64 vAddr = sharedMem->Request.Address;
+        if (vAddr > 0x00007FFFFFFFFFFF && vAddr < 0xFFFF800000000000) {
+            return STATUS_INVALID_ADDRESS; // Non-canonical address
+        }
+
         PEPROCESS process = NULL;
         NTSTATUS status = PsLookupProcessByProcessId((HANDLE)(ULONG_PTR)sharedMem->Request.ProcessId, &process);
         if (!NT_SUCCESS(status) || !process)
@@ -209,11 +249,16 @@ NTSTATUS HandleReadMemory(PSHARED_MEMORY sharedMem) {
         
         if (!cr3) return STATUS_UNSUCCESSFUL;
 
-        UINT64 physAddr = TranslateLinear(cr3, sharedMem->Request.Address);
+        UINT64 physAddr = TranslateLinear(cr3, vAddr);
         if (!physAddr) return STATUS_UNSUCCESSFUL;
 
         SIZE_T bytesRead = 0;
         ULONG64 sizeToRead = FindMin(PAGE_SIZE - (physAddr & 0xFFF), sharedMem->Request.Size);
+        
+        // Additional safety check
+        if (sizeToRead == 0 || sizeToRead > MAX_DATA_SIZE) {
+            return STATUS_INVALID_PARAMETER;
+        }
         
         status = SafeReadPhysicalMemory(physAddr, sharedMem->Data, (SIZE_T)sizeToRead, &bytesRead);
         if (NT_SUCCESS(status)) {

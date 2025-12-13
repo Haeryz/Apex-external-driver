@@ -13,7 +13,8 @@ An advanced external overlay application for Apex Legends featuring ESP (Extra S
 ```
 
 ```
-& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" "C:\Users\haeri\Downloads\Compressed\skibidirizz\ext\apex_esp.vcxproj" /p:Configuration=Release /p:Platform=x64 /t:Build
+# Build ext
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" "c:\Users\haeri\Downloads\Compressed\skibidirizz\ext\apex_esp.vcxproj" /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0.26100.0 /t:Rebuild /m
 ```
 
 ## 📊 Current Project State

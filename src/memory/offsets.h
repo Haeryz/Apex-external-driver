@@ -3,21 +3,21 @@
 
 
 // === Core Game Pointers ===
-#define OFF_LOCAL_PLAYER 0x2a7be28       // Local player pointer
-#define OFF_ENTITY_LIST 0x65fe6d8        // Entity list base
-#define OFF_VIEWRENDER 0x40d8a38         // ViewRender pointer
+#define OFF_LOCAL_PLAYER 0x2a7bec8       // Local player pointer
+#define OFF_ENTITY_LIST 0x65fe858        // Entity list base
+#define OFF_VIEWRENDER 0x40d8bb8         // ViewRender pointer
 #define OFF_VIEWMATRIX 0x11a350          // ViewMatrix offset from ViewRender
 
 // === Player & Entity Stats (ESP Critical) ===
-#define OFF_HEALTH 0x0324                // Current health
-#define OFF_MAXHEALTH 0x0468             // Maximum health
-#define OFF_SHIELD 0x01a0                // Current shield
-#define OFF_MAXSHIELD 0x01A4             // Maximum shield
-#define OFF_ARMORTYPE 0x4974             // Armor type (0=None, 1=White, 2=Blue, 3=Purple, 4=Gold)
+#define OFF_HEALTH 0x324                // Current health
+#define OFF_MAXHEALTH 0x468             // Maximum health
+#define OFF_SHIELD 0x1a0                // Current shield
+#define OFF_MAXSHIELD 0x1A4             // Maximum shield
+#define OFF_ARMORTYPE 0x485c             // Armor type (0=None, 1=White, 2=Blue, 3=Purple, 4=Gold)
 #define OFF_LOCAL_ORIGIN 0x017c          // Entity position (X, Y, Z)
-#define OFF_TEAM_NUMBER 0x0334           // Team ID
+#define OFF_TEAM_NUMBER 0x334           // Team ID
 #define OFF_LIFE_STATE 0x0690            // Life state (0 = alive)
-#define OFF_BLEEDOUT_STATE 0x2920        // Bleedout/knockdown state (0 = not knocked)
+#define OFF_BLEEDOUT_STATE 0x2828        // Bleedout/knockdown state (0 = not knocked)
 #define OFF_LAST_VISIBLE_TIME 0x1a54     // Last time entity was visible
 
 // === Bone System (for skeleton ESP if needed) ===
