@@ -109,6 +109,16 @@ bool InitializeDriver() {
         }
     }
     std::cout << "[+] Driver interface initialized!" << std::endl;
+    
+    // Enable kernel-level process protection (ObCallbacks)
+    // This prevents anti-cheats from opening handles to this process
+    std::cout << "[*] Enabling kernel process protection..." << std::endl;
+    if (g_Driver->EnableProcessProtection()) {
+        std::cout << "[+] Process protection active - handles stripped!" << std::endl;
+    } else {
+        std::cout << "[!] Process protection failed (non-critical)" << std::endl;
+    }
+    
     return true;
 }
 
