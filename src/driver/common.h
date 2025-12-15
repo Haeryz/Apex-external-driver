@@ -31,7 +31,8 @@ typedef enum _COMMAND_TYPE {
     CMD_READ_MEMORY = 1,
     CMD_GET_PROCESS_BASE = 3,
     CMD_GET_DTB = 4, // Directory Table Base (CR3)
-    CMD_MOUSE_CLICK = 5
+    CMD_MOUSE_CLICK = 5,
+    CMD_SET_PROTECTED_PID = 10  // Set PID to protect with ObCallbacks
 } COMMAND_TYPE;
 
 typedef enum _COMMAND_STATUS {
