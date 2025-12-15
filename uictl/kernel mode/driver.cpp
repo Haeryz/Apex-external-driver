@@ -4,12 +4,235 @@
 // ============================================================================
 // KDMAPPER-COMPATIBLE DRIVER with IoCreateDriver
 // Fixed version with proper error handling and safe memory operations
+// NOW WITH ObRegisterCallbacks PROCESS PROTECTION
 // ============================================================================
 
 PDEVICE_OBJECT g_DeviceObject = NULL;
 HANDLE g_SectionHandle = NULL;
 PVOID g_SharedMemory = NULL;
 volatile LONG g_DriverReady = 0;  // Flag to indicate driver is ready
+
+// ============================================================================
+// PROCESS PROTECTION - ObRegisterCallbacks
+// ============================================================================
+
+PVOID g_CallbackRegistration = NULL;  // Handle to unregister callbacks
+ULONG g_ProtectedPid = 0;             // PID to protect (set by ext.exe)
+
+// Command to set protected PID
+#define CMD_SET_PROTECTED_PID 10
+
+// Pre-operation callback for process handle operations
+OB_PREOP_CALLBACK_STATUS PreProcessHandleCallback(
+    PVOID RegistrationContext,
+    POB_PRE_OPERATION_INFORMATION OperationInfo
+) {
+    UNREFERENCED_PARAMETER(RegistrationContext);
+    
+    __try {
+        if (!OperationInfo || !OperationInfo->Object) {
+            return OB_PREOP_SUCCESS;
+        }
+        
+        // Only protect if we have a PID to protect
+        if (g_ProtectedPid == 0) {
+            return OB_PREOP_SUCCESS;
+        }
+        
+        PEPROCESS targetProcess = (PEPROCESS)OperationInfo->Object;
+        HANDLE targetPid = PsGetProcessId(targetProcess);
+        
+        // If someone is opening a handle to our protected process
+        if ((ULONG)(ULONG_PTR)targetPid == g_ProtectedPid) {
+            // Don't strip our own access
+            PEPROCESS currentProcess = PsGetCurrentProcess();
+            HANDLE currentPid = PsGetProcessId(currentProcess);
+            
+            if ((ULONG)(ULONG_PTR)currentPid == g_ProtectedPid) {
+                return OB_PREOP_SUCCESS;  // Allow self-access
+            }
+            
+            // Allow SYSTEM (PID 4) and csrss
+            if ((ULONG_PTR)currentPid <= 4) {
+                return OB_PREOP_SUCCESS;
+            }
+            
+            // Strip dangerous access rights from everyone else
+            if (OperationInfo->Operation == OB_OPERATION_HANDLE_CREATE) {
+                // Remove rights that allow memory read/write and process manipulation
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_VM_READ;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_VM_WRITE;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_VM_OPERATION;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_DUP_HANDLE;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_CREATE_THREAD;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_TERMINATE;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_SUSPEND_RESUME;
+            }
+            else if (OperationInfo->Operation == OB_OPERATION_HANDLE_DUPLICATE) {
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~PROCESS_VM_READ;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~PROCESS_VM_WRITE;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~PROCESS_VM_OPERATION;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~PROCESS_DUP_HANDLE;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~PROCESS_CREATE_THREAD;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~PROCESS_TERMINATE;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~PROCESS_SUSPEND_RESUME;
+            }
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        // Silent failure
+    }
+    
+    return OB_PREOP_SUCCESS;
+}
+
+// Pre-operation callback for thread handle operations
+OB_PREOP_CALLBACK_STATUS PreThreadHandleCallback(
+    PVOID RegistrationContext,
+    POB_PRE_OPERATION_INFORMATION OperationInfo
+) {
+    UNREFERENCED_PARAMETER(RegistrationContext);
+    
+    __try {
+        if (!OperationInfo || !OperationInfo->Object) {
+            return OB_PREOP_SUCCESS;
+        }
+        
+        if (g_ProtectedPid == 0) {
+            return OB_PREOP_SUCCESS;
+        }
+        
+        PETHREAD targetThread = (PETHREAD)OperationInfo->Object;
+        PEPROCESS ownerProcess = IoThreadToProcess(targetThread);
+        
+        if (!ownerProcess) {
+            return OB_PREOP_SUCCESS;
+        }
+        
+        HANDLE ownerPid = PsGetProcessId(ownerProcess);
+        
+        // If thread belongs to our protected process
+        if ((ULONG)(ULONG_PTR)ownerPid == g_ProtectedPid) {
+            PEPROCESS currentProcess = PsGetCurrentProcess();
+            HANDLE currentPid = PsGetProcessId(currentProcess);
+            
+            if ((ULONG)(ULONG_PTR)currentPid == g_ProtectedPid) {
+                return OB_PREOP_SUCCESS;  // Allow self-access
+            }
+            
+            if ((ULONG_PTR)currentPid <= 4) {
+                return OB_PREOP_SUCCESS;  // Allow SYSTEM
+            }
+            
+            // Strip dangerous thread access rights
+            if (OperationInfo->Operation == OB_OPERATION_HANDLE_CREATE) {
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~THREAD_SUSPEND_RESUME;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~THREAD_TERMINATE;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~THREAD_SET_CONTEXT;
+                OperationInfo->Parameters->CreateHandleInformation.DesiredAccess &= ~THREAD_GET_CONTEXT;
+            }
+            else if (OperationInfo->Operation == OB_OPERATION_HANDLE_DUPLICATE) {
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~THREAD_SUSPEND_RESUME;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~THREAD_TERMINATE;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~THREAD_SET_CONTEXT;
+                OperationInfo->Parameters->DuplicateHandleInformation.DesiredAccess &= ~THREAD_GET_CONTEXT;
+            }
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        // Silent failure
+    }
+    
+    return OB_PREOP_SUCCESS;
+}
+
+// Register ObCallbacks for process/thread protection
+NTSTATUS RegisterProtectionCallbacks() {
+    __try {
+        if (g_CallbackRegistration != NULL) {
+            return STATUS_SUCCESS;  // Already registered
+        }
+        
+        OB_OPERATION_REGISTRATION opRegistration[2] = { 0 };
+        OB_CALLBACK_REGISTRATION callbackRegistration = { 0 };
+        
+        // Process handle callback
+        opRegistration[0].ObjectType = PsProcessType;
+        opRegistration[0].Operations = OB_OPERATION_HANDLE_CREATE | OB_OPERATION_HANDLE_DUPLICATE;
+        opRegistration[0].PreOperation = PreProcessHandleCallback;
+        opRegistration[0].PostOperation = NULL;
+        
+        // Thread handle callback
+        opRegistration[1].ObjectType = PsThreadType;
+        opRegistration[1].Operations = OB_OPERATION_HANDLE_CREATE | OB_OPERATION_HANDLE_DUPLICATE;
+        opRegistration[1].PreOperation = PreThreadHandleCallback;
+        opRegistration[1].PostOperation = NULL;
+        
+        // Callback registration structure
+        callbackRegistration.Version = OB_FLT_REGISTRATION_VERSION;
+        callbackRegistration.OperationRegistrationCount = 2;
+        callbackRegistration.OperationRegistration = opRegistration;
+        
+        // Use a fake altitude for stealth (looks like AV driver)
+        RtlInitUnicodeString(&callbackRegistration.Altitude, L"321000");
+        callbackRegistration.RegistrationContext = NULL;
+        
+        NTSTATUS status = ObRegisterCallbacks(&callbackRegistration, &g_CallbackRegistration);
+        return status;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return STATUS_ACCESS_VIOLATION;
+    }
+}
+
+void UnregisterProtectionCallbacks() {
+    __try {
+        if (g_CallbackRegistration != NULL) {
+            ObUnRegisterCallbacks(g_CallbackRegistration);
+            g_CallbackRegistration = NULL;
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        // Silent failure
+    }
+}
+
+// Handle command to set protected PID
+NTSTATUS HandleSetProtectedPid(PSHARED_MEMORY sharedMem) {
+    __try {
+        if (!sharedMem) return STATUS_INVALID_PARAMETER;
+        
+        // The PID to protect is passed in Request.ProcessId
+        ULONG newPid = sharedMem->Request.ProcessId;
+        
+        if (newPid == 0) {
+            // Disable protection
+            g_ProtectedPid = 0;
+            return STATUS_SUCCESS;
+        }
+        
+        // Verify the process exists
+        PEPROCESS process = NULL;
+        NTSTATUS status = PsLookupProcessByProcessId((HANDLE)(ULONG_PTR)newPid, &process);
+        if (!NT_SUCCESS(status) || !process) {
+            return STATUS_NOT_FOUND;
+        }
+        ObDereferenceObject(process);
+        
+        // Set the protected PID
+        g_ProtectedPid = newPid;
+        
+        // Make sure callbacks are registered
+        if (g_CallbackRegistration == NULL) {
+            RegisterProtectionCallbacks();
+        }
+        
+        return STATUS_SUCCESS;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return STATUS_ACCESS_VIOLATION;
+    }
+}
 
 // Windows version offsets
 #define win_1803 17134
@@ -335,6 +558,9 @@ void ProcessCommand(PSHARED_MEMORY sharedMem) {
         case CMD_GET_DTB:
             status = HandleGetDtb(sharedMem);
             break;
+        case CMD_SET_PROTECTED_PID:
+            status = HandleSetProtectedPid(sharedMem);
+            break;
         case CMD_MOUSE_CLICK:
             status = STATUS_NOT_IMPLEMENTED;
             break;
@@ -546,6 +772,9 @@ NTSTATUS InitializeDriver(PDRIVER_OBJECT drvObj, PUNICODE_STRING regPath) {
         
         // Pre-create shared memory
         CreateSharedMemory();
+        
+        // Register ObCallbacks for process protection
+        RegisterProtectionCallbacks();
         
         // Mark driver as ready
         InterlockedExchange(&g_DriverReady, 1);
