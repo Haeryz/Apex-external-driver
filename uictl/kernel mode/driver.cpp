@@ -7,6 +7,24 @@
 // NOW WITH ObRegisterCallbacks PROCESS PROTECTION
 // ============================================================================
 
+// Process access rights (not defined in kernel headers)
+#ifndef PROCESS_VM_READ
+#define PROCESS_VM_READ           0x0010
+#define PROCESS_VM_WRITE          0x0020
+#define PROCESS_VM_OPERATION      0x0008
+#define PROCESS_DUP_HANDLE        0x0040
+#define PROCESS_CREATE_THREAD     0x0002
+#define PROCESS_TERMINATE         0x0001
+#define PROCESS_SUSPEND_RESUME    0x0800
+#endif
+
+#ifndef THREAD_SUSPEND_RESUME
+#define THREAD_SUSPEND_RESUME     0x0002
+#define THREAD_TERMINATE          0x0001
+#define THREAD_SET_CONTEXT        0x0010
+#define THREAD_GET_CONTEXT        0x0008
+#endif
+
 PDEVICE_OBJECT g_DeviceObject = NULL;
 HANDLE g_SectionHandle = NULL;
 PVOID g_SharedMemory = NULL;
@@ -197,43 +215,6 @@ void UnregisterProtectionCallbacks() {
     }
 }
 
-// Handle command to set protected PID
-NTSTATUS HandleSetProtectedPid(PSHARED_MEMORY sharedMem) {
-    __try {
-        if (!sharedMem) return STATUS_INVALID_PARAMETER;
-        
-        // The PID to protect is passed in Request.ProcessId
-        ULONG newPid = sharedMem->Request.ProcessId;
-        
-        if (newPid == 0) {
-            // Disable protection
-            g_ProtectedPid = 0;
-            return STATUS_SUCCESS;
-        }
-        
-        // Verify the process exists
-        PEPROCESS process = NULL;
-        NTSTATUS status = PsLookupProcessByProcessId((HANDLE)(ULONG_PTR)newPid, &process);
-        if (!NT_SUCCESS(status) || !process) {
-            return STATUS_NOT_FOUND;
-        }
-        ObDereferenceObject(process);
-        
-        // Set the protected PID
-        g_ProtectedPid = newPid;
-        
-        // Make sure callbacks are registered
-        if (g_CallbackRegistration == NULL) {
-            RegisterProtectionCallbacks();
-        }
-        
-        return STATUS_SUCCESS;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        return STATUS_ACCESS_VIOLATION;
-    }
-}
-
 // Windows version offsets
 #define win_1803 17134
 #define win_1809 17763
@@ -281,6 +262,46 @@ typedef struct _SHARED_MEMORY {
     ULONG32 ResponseSize;
     UCHAR Data[MAX_DATA_SIZE];
 } SHARED_MEMORY, *PSHARED_MEMORY;
+
+// Forward declaration
+NTSTATUS RegisterProtectionCallbacks();
+
+// Handle command to set protected PID
+NTSTATUS HandleSetProtectedPid(PSHARED_MEMORY sharedMem) {
+    __try {
+        if (!sharedMem) return STATUS_INVALID_PARAMETER;
+        
+        // The PID to protect is passed in Request.ProcessId
+        ULONG newPid = sharedMem->Request.ProcessId;
+        
+        if (newPid == 0) {
+            // Disable protection
+            g_ProtectedPid = 0;
+            return STATUS_SUCCESS;
+        }
+        
+        // Verify the process exists
+        PEPROCESS process = NULL;
+        NTSTATUS status = PsLookupProcessByProcessId((HANDLE)(ULONG_PTR)newPid, &process);
+        if (!NT_SUCCESS(status) || !process) {
+            return STATUS_NOT_FOUND;
+        }
+        ObDereferenceObject(process);
+        
+        // Set the protected PID
+        g_ProtectedPid = newPid;
+        
+        // Make sure callbacks are registered
+        if (g_CallbackRegistration == NULL) {
+            RegisterProtectionCallbacks();
+        }
+        
+        return STATUS_SUCCESS;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return STATUS_ACCESS_VIOLATION;
+    }
+}
 
 extern "C" NTSTATUS NTAPI IoCreateDriver(PUNICODE_STRING DriverName, PDRIVER_INITIALIZE InitializationFunction);
 extern "C" PVOID NTAPI PsGetProcessSectionBaseAddress(PEPROCESS Process);
