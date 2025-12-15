@@ -260,6 +260,48 @@ bool DriverInterface::InjectMouseClick() {
     return true;
 }
 
+bool DriverInterface::EnableProcessProtection() {
+    if (!sharedMemory || deviceHandle == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    
+    // Get our own PID and send it to the driver for protection
+    DWORD myPid = GetCurrentProcessId();
+    
+    sharedMemory->Request.ProcessId = myPid;
+    sharedMemory->Request.Address = 0;
+    sharedMemory->Request.Buffer = 0;
+    sharedMemory->Request.Size = 0;
+    
+    bool success = SendCommand(CMD_SET_PROTECTED_PID);
+    
+    if (success) {
+        std::cout << "[+] Process protection enabled for PID " << myPid << std::endl;
+    }
+    
+    return success;
+}
+
+bool DriverInterface::DisableProcessProtection() {
+    if (!sharedMemory || deviceHandle == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    
+    // Send PID 0 to disable protection
+    sharedMemory->Request.ProcessId = 0;
+    sharedMemory->Request.Address = 0;
+    sharedMemory->Request.Buffer = 0;
+    sharedMemory->Request.Size = 0;
+    
+    bool success = SendCommand(CMD_SET_PROTECTED_PID);
+    
+    if (success) {
+        std::cout << "[+] Process protection disabled" << std::endl;
+    }
+    
+    return success;
+}
+
 void DriverInterface::Cleanup() {
     if (sharedMemory) {
         UnmapViewOfFile(sharedMemory);
