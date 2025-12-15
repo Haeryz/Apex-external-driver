@@ -32,6 +32,10 @@ public:
     // Mouse injection (kernel-level via bootkit-protected driver)
     bool InjectMouseClick();
     
+    // Process protection - enables ObCallbacks to protect this process
+    bool EnableProcessProtection();
+    bool DisableProcessProtection();
+    
     void SetCurrentPid(DWORD pid) { currentPid = pid; }
     DWORD GetCurrentPid() const { return currentPid; }
     
