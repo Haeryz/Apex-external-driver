@@ -83,9 +83,9 @@ Vector2 g_ScreenSize = { 1920, 1080 };
 // Menu state
 bool g_ShowMenu = false;
 
-// FPS Limiter settings (optimized for lower CPU usage)
-int g_TargetFPS = 30;  // Default: 30 FPS (was 60, reduced for performance)
-int g_SleepTime = 33;   // Calculated from target FPS (was 16ms)
+// FPS Limiter settings - INCREASED for real-time ESP
+int g_TargetFPS = 144;  // High FPS for smooth, real-time ESP
+int g_SleepTime = 1;    // Minimal sleep (1ms) - let the loop run fast
 
 // Gameplay hotkeys removed (ESP-only mode)
 void ProcessSettingsHotkeys() {

@@ -37,11 +37,11 @@ struct Entity {
             return;
         }
 
-        // Optimization: Read all data in one go (up to ArmorType)
-        // Max offset needed is OFF_ARMORTYPE (0x4974)
-        // We read 0x5000 bytes (20KB) to cover all needed offsets with safety margin
-        // This reduces 10+ calls to 1 call per entity
-        constexpr size_t READ_SIZE = 0x5000;
+        // Optimization: Read only essential data
+        // Key offsets: position (0x17c), health (0x324), team (0x334), maxHealth (0x468), lifeState (0x690)
+        // For ESP we need up to ~0x700 bytes max (lifeState at 0x690)
+        // ArmorType at 0x4974 is optional - skip it for speed
+        constexpr size_t READ_SIZE = 0x700;  // Reduced from 0x5000 for speed
         uint8_t buffer[READ_SIZE];
         
         if (!g_Driver->ReadMemory(g_Driver->GetCurrentPid(), address, buffer, READ_SIZE)) {
@@ -51,6 +51,7 @@ struct Entity {
         
         // Helper lambda to read from buffer
         auto Get = [&](uintptr_t offset) -> auto* {
+            if (offset >= READ_SIZE) return (uint8_t*)nullptr;
             return reinterpret_cast<uint8_t*>(buffer + offset);
         };
 
@@ -68,20 +69,20 @@ struct Entity {
         maxHealth = *reinterpret_cast<int*>(Get(OFF_MAXHEALTH));
         shield = *reinterpret_cast<int*>(Get(OFF_SHIELD));
         maxShield = *reinterpret_cast<int*>(Get(OFF_MAXSHIELD));
-        armorType = *reinterpret_cast<int*>(Get(OFF_ARMORTYPE)); // 0-4 for shield tier
+        armorType = 1; // Default to white armor (skip reading for speed)
         team = *reinterpret_cast<int*>(Get(OFF_TEAM_NUMBER));
         
         // Read velocity for prediction
         velocity = *reinterpret_cast<Vector3*>(Get(OFF_ABSVELOCITY));
         
         // Visibility check (compare lastVisibleTime with current time)
-        float lastVisibleTime = *reinterpret_cast<float*>(Get(OFF_LAST_VISIBLE_TIME));
-        isVisible = (lastVisibleTime > 0); // Simplified visibility check
+        // OFF_LAST_VISIBLE_TIME is 0x1a54 which is > READ_SIZE, skip for now
+        isVisible = true; // Assume visible for speed
         
         // Check life state and bleedout state
         int lifeState = *reinterpret_cast<int*>(Get(OFF_LIFE_STATE));
-        bleedoutState = *reinterpret_cast<int*>(Get(OFF_BLEEDOUT_STATE));
-        isKnocked = (bleedoutState > 0);
+        bleedoutState = 0; // Skip bleedout check (offset 0x2920 > READ_SIZE)
+        isKnocked = false;
         
         // Valid if alive (lifeState == 0). We allow knocked enemies (bleedoutState > 0)
         valid = (lifeState == 0 && health > 0); 

@@ -90,42 +90,22 @@ bool DriverInterface::Initialize() {
 
 bool DriverInterface::SendCommand(COMMAND_TYPE command) {
     if (!sharedMemory || !deviceHandle || deviceHandle == INVALID_HANDLE_VALUE) {
-        std::cerr << "[DEBUG] SendCommand: Invalid state" << std::endl;
         return false;
     }
     
-    std::cout << "[DEBUG] SendCommand: Setting command=" << command << std::endl;
     sharedMemory->Command = command;
     sharedMemory->Status = CMD_STATUS_PENDING;
     
     // Signal driver (using legitimate IOCTL name)
     DWORD bytes = 0;
-    std::cout << "[DEBUG] SendCommand: Sending IOCTL..." << std::endl;
     if (!DeviceIoControl(deviceHandle, IOCTL_WD_QUERY_INFO, NULL, 0, NULL, 0, &bytes, NULL)) {
-        DWORD error = GetLastError();
-        std::cerr << "[DEBUG] DeviceIoControl failed with error: " << error << std::endl;
         return false;
     }
     
-    std::cout << "[DEBUG] SendCommand: Waiting for completion..." << std::endl;
-    // Wait for completion
-    int timeout = 1000;
+    // Spin-wait for completion (no sleep for max speed)
+    int timeout = 10000;  // ~10000 spins max
     while (sharedMemory->Status == CMD_STATUS_PENDING && timeout-- > 0) {
-        Sleep(1);
-    }
-    
-    std::cout << "[DEBUG] SendCommand: Final status=" << (int)sharedMemory->Status << std::endl;
-    std::cout << "[DEBUG] SendCommand: ResponseSize=" << sharedMemory->ResponseSize << std::endl;
-    
-    // Hex dump first 32 bytes of Data for debugging
-    std::cout << "[DEBUG] SendCommand: Data (first 32 bytes): ";
-    for (int i = 0; i < 32 && i < MAX_DATA_SIZE; i++) {
-        printf("%02X ", sharedMemory->Data[i]);
-    }
-    std::cout << std::endl;
-    
-    if (timeout <= 0) {
-        std::cerr << "[DEBUG] SendCommand: TIMEOUT!" << std::endl;
+        _mm_pause();  // CPU hint for spin-wait
     }
     
     return (sharedMemory->Status == CMD_STATUS_COMPLETED);
